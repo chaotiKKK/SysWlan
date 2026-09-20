@@ -18,6 +18,8 @@ Push-Location $projectRoot
 try {
     & $sdk run --project tests/SysWlan.Tests -c Release
     if ($LASTEXITCODE) { throw 'Tests failed.' }
+    $runningApp = Get-Process -Name 'SysWlan.App' -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($projectRoot, [System.StringComparison]::OrdinalIgnoreCase) }
+    if ($runningApp) { throw 'Windows publish cannot replace locked files. Close SysWlan.App and run scripts\\build.ps1 again.' }
     & $sdk publish src/SysWlan.App/SysWlan.App.csproj -c Release -r win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -p:WindowsPackageType=None -o artifacts/windows
     if ($LASTEXITCODE) { throw 'Windows publish failed.' }
     Write-Output (Join-Path $projectRoot 'artifacts\windows\SysWlan.App.exe')
