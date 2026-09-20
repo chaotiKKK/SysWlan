@@ -1,0 +1,10 @@
+<section class="day-timeline" aria-label="Tageszeitleiste">
+    @foreach(var hour in Enumerable.Range(0, 24)){<div class="day-row"><time>@($"{hour:00}:00")</time><div class="day-track">@foreach(var device in Snapshot.Devices.Where(d => d.IsVisible)){foreach(var interval in Intervals(device, hour)){<div class="day-bar" style="--device-color:@device.Color"><strong>@device.Name</strong><span>@(interval.IsOpen ? "aktuell" : "anwesend")</span></div>}}@if(ShowActivity){foreach(var activity in Snapshot.Activity.Where(a => a.Start.LocalDateTime.Hour == hour)){<small class="activity-label">Aktivität: @(activity.Availability == ActivityAvailability.Available ? $"{activity.ReceiveMbps:N1}/{activity.SendMbps:N1} MBit/s" : "nicht verfügbar")</small>}}@if(ShowEvents){foreach(var entry in Snapshot.Events.Where(e => e.Timestamp.LocalDateTime.Hour == hour)){<div class="day-event">@(entry.Type == DeviceEventType.CollectionError ? "!" : "●") @entry.Message</div>}}</div></div>}
+</section>
+@code {
+    [Parameter, EditorRequired] public CalendarSnapshot Snapshot { get; set; } = new([], [], [], []);
+    [Parameter] public bool ShowPresence { get; set; } = true;
+    [Parameter] public bool ShowActivity { get; set; } = true;
+    [Parameter] public bool ShowEvents { get; set; } = true;
+    private IEnumerable<PresenceInterval> Intervals(CalendarDevice device, int hour) => ShowPresence ? Snapshot.Presence.Where(p => device.SourceKeys.Contains(p.SourceKey) && p.Start.LocalDateTime.Hour <= hour && (p.End?.LocalDateTime.Hour ?? 23) >= hour) : [];
+}

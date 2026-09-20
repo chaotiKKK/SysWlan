@@ -1,0 +1,15 @@
+<section class="calendar-week" aria-label="Wochenkalender">
+    <div class="week-header"><span>Zeit</span>@foreach(var day in Days){<strong>@day.ToString("ddd dd.MM.")</strong>}</div>
+    @foreach(var slot in Slots){<div class="week-row"><span class="week-time">@slot.Label</span>@foreach(var day in Days){<div class="week-cell">@foreach(var device in Snapshot.Devices.Where(d => d.IsVisible)){foreach(var interval in Intervals(device, day, slot)){<div class="week-bar" style="--device-color:@device.Color" title="@device.Name: @interval.Quality"><span>@device.Name</span></div>}}@if(ShowEvents){foreach(var entry in Snapshot.Events.Where(e => e.Timestamp.Date == day.ToDateTime(TimeOnly.MinValue).Date && e.Timestamp.Hour >= slot.Start && e.Timestamp.Hour < slot.Start + 6)){<div class="week-event">● @entry.Message</div>}}</div>}</div>}
+</section>
+@code {
+    [Parameter, EditorRequired] public CalendarSnapshot Snapshot { get; set; } = new([], [], [], []);
+    [Parameter] public DateOnly Anchor { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    [Parameter] public bool ShowPresence { get; set; } = true;
+    [Parameter] public bool ShowActivity { get; set; } = true;
+    [Parameter] public bool ShowEvents { get; set; } = true;
+    private DateOnly Monday => Anchor.AddDays(-(((int)Anchor.DayOfWeek + 6) % 7));
+    private IEnumerable<DateOnly> Days => Enumerable.Range(0, 7).Select(i => Monday.AddDays(i));
+    private static readonly (int Start, string Label)[] Slots = [(0, "00–06"), (6, "06–12"), (12, "12–18"), (18, "18–24")];
+    private IEnumerable<PresenceInterval> Intervals(CalendarDevice device, DateOnly day, (int Start, string Label) slot) => ShowPresence ? Snapshot.Presence.Where(p => device.SourceKeys.Contains(p.SourceKey) && p.Start.LocalDateTime.Date <= day.ToDateTime(TimeOnly.MinValue).Date && (p.End?.LocalDateTime.Date ?? day.ToDateTime(TimeOnly.MinValue).Date) >= day.ToDateTime(TimeOnly.MinValue).Date && p.Start.LocalDateTime.Hour < slot.Start + 6 && (p.End?.LocalDateTime.Hour ?? 23) >= slot.Start) : [];
+}

@@ -1,0 +1,8 @@
+<section class="month-heatmap" aria-label="Monats-Heatmap"><div class="month-grid">@foreach(var day in Days){var count = PresenceCount(day);var events = EventCount(day);<div class="month-day level-@Math.Min(count, 4)" title="@day: @count Beobachtungsintervalle, @events Ereignisse"><strong>@day.Day</strong><span>@(count == 0 ? "keine Beobachtung" : $"{count} Intervall(e)")</span>@if(events > 0){<small>● @events Ereignis(se)</small>}</div>}</div><p class="subtle">Die Heatmap zeigt Beobachtungsdichte, nicht sicheren Online-/Offline-Status. Aktivität ohne Quelle bleibt „nicht verfügbar“.</p></section>
+@code {
+    [Parameter, EditorRequired] public CalendarSnapshot Snapshot { get; set; } = new([], [], [], []);
+    [Parameter] public DateOnly Anchor { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    private IEnumerable<DateOnly> Days { get { var first = new DateOnly(Anchor.Year, Anchor.Month, 1); return Enumerable.Range(0, DateTime.DaysInMonth(first.Year, first.Month)).Select(i => first.AddDays(i)); } }
+    private int PresenceCount(DateOnly day) => Snapshot.Presence.Count(p => p.Start.LocalDateTime.Date <= day.ToDateTime(TimeOnly.MinValue).Date && (p.End?.LocalDateTime.Date ?? day.ToDateTime(TimeOnly.MinValue).Date) >= day.ToDateTime(TimeOnly.MinValue).Date);
+    private int EventCount(DateOnly day) => Snapshot.Events.Count(e => e.Timestamp.LocalDateTime.Date == day.ToDateTime(TimeOnly.MinValue).Date);
+}

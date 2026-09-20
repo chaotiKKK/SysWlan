@@ -1,3 +1,4 @@
+using System.Net;
 using SysWlan.Core;
 
 var failed = 0;
@@ -178,6 +179,17 @@ Check("CalDAV environment override is secret-safe", () =>
     }
     finally { File.Delete(path); }
 });
+Check("CalDAV discovers, creates, updates and deletes collection objects", () =>
+{
+    using var handler = new RecordingCalDavHandler();
+    using var http = new HttpClient(handler);
+    var client = new CalDavClient(http, new CalDavOptions("https://calendar.test/dav", "user", "secret"));
+    var items = new[] { new CalendarSyncItem("calendar", "one", "one", "BEGIN:VCALENDAR", null), new CalendarSyncItem("calendar", "gone", "gone", "", "etag-old") };
+    var results = client.PushAsync(items, CancellationToken.None).GetAwaiter().GetResult();
+    Require(results.All(r => r.Status == SyncStatus.Synced), "CalDAV object flow failed");
+    Require(handler.Methods.SequenceEqual(["PROPFIND", "MKCALENDAR", "PUT", "DELETE"]), "unexpected CalDAV capability/object flow: " + string.Join(',', handler.Methods));
+    Require(handler.AuthorizationSeen && handler.UpdateConditionSeen, "CalDAV auth/conditional update missing");
+});
 if (args.Contains("--live"))
 {
     var snapshot = await new SysWlan.Windows.WindowsCollector().CollectAsync(CancellationToken.None);
@@ -189,6 +201,20 @@ if (args.Contains("--live"))
 Console.WriteLine($"\n{failed} failed");
 return failed == 0 ? 0 : 1;
 
+sealed class RecordingCalDavHandler : HttpMessageHandler
+{
+    public List<string> Methods { get; } = [];
+    public bool AuthorizationSeen { get; private set; }
+    public bool UpdateConditionSeen { get; private set; }
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        Methods.Add(request.Method.Method);
+        AuthorizationSeen |= request.Headers.Authorization is not null;
+        UpdateConditionSeen |= request.Method == HttpMethod.Put && request.Headers.Contains("If-None-Match");
+        var status = request.Method.Method switch { "PROPFIND" => HttpStatusCode.NotFound, "MKCALENDAR" => HttpStatusCode.Created, "PUT" => HttpStatusCode.Created, "DELETE" => HttpStatusCode.NoContent, _ => HttpStatusCode.BadRequest };
+        return Task.FromResult(new HttpResponseMessage(status) { RequestMessage = request });
+    }
+}
 sealed class StalledHandler : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) });
