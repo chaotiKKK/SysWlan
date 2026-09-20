@@ -1,0 +1,4 @@
+<div class="section-heading"><div><span class="eyebrow">NACHVOLLZIEHBARE BEFUNDE</span><h2>Sicherheit im Blick.</h2></div><span class="pill muted">Stand @Format.Time(State.Snapshot?.Timestamp)</span></div>
+<p class="notice">Die Bewertung basiert auf beobachteten Einstellungen. Sie ist kein vollständiger Penetrationstest und kein Nachweis, dass der Router sicher ist.</p>
+<div class="findings">@foreach(var finding in State.Findings){<section class="panel finding"><span class="finding-icon @Format.Tone(finding.Severity)">@(finding.Severity == "OK" ? "✓" : finding.Severity == "Warnung" ? "!" : "i")</span><div><h3>@finding.Title</h3><p>@finding.Detail</p><small>Quelle: @finding.Source</small></div><span class="pill @Format.Tone(finding.Severity)">@finding.Severity</span></section>}</div>
+@code { [Parameter] public MonitorState State { get; set; } = new(); }

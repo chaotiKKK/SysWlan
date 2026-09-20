@@ -1,0 +1,24 @@
+<div class="section-heading"><div><span class="eyebrow">DEINE VERBINDUNG</span><h2>Vom Gerät zum Gateway.</h2></div><span class="pill @(S?.Connected == true ? "good" : "muted")">@(S?.Connected == true ? "Gateway vorhanden" : "Warte auf Netzwerk")</span></div>
+<section class="topology panel">
+    <div class="topology-node"><div class="node-icon">▣</div><div><strong>@Environment.MachineName</strong><span>Dieser Windows-PC</span><code>@Format.Value(S?.Addresses.FirstOrDefault(a => !a.Contains(':')))</code></div></div>
+    <div class="topology-link"><span>@Format.Value(S?.InterfaceName)</span><div class="wire"></div><small>@(S?.Wlan.Authentication ?? "Netzwerkverbindung")</small></div>
+    <div class="topology-node"><div class="node-icon router-icon">≋</div><div><strong>@(Profile?.Name ?? S?.Ssid ?? "Router wird erkannt")</strong><span>@State.Router.Vendor</span><code>@Format.Value(S?.Gateway)</code></div></div>
+    <div class="topology-link"><span>@(State.Router.WanMode ?? "WAN")</span><div class="wire secondary"></div><small>Routerstatus</small></div>
+    <div class="topology-node wan-node"><div class="node-icon">◎</div><div><strong>@(State.Router.ConnectionStatus ?? "Unbekannt")</strong><span>Internetanschluss</span><small>@Format.Time(State.Router.CheckedAt)</small></div></div>
+</section>
+<div class="metrics">
+    <section class="metric"><span><i class="dot rx"></i> Empfang · dieser PC</span><div>@Format.Rate(State.Traffic?.ReceiveMbps)<small>MBit/s</small></div><p>@Format.Bytes(Profile?.ReceivedBytes ?? 0) beobachtet im Profil</p></section>
+    <section class="metric"><span><i class="dot tx"></i> Senden · dieser PC</span><div>@Format.Rate(State.Traffic?.SendMbps)<small>MBit/s</small></div><p>@Format.Bytes(Profile?.SentBytes ?? 0) beobachtet im Profil</p></section>
+    <section class="metric"><span>Gateway-Latenz</span><div>@Format.Value(S?.GatewayLatencyMs)<small>ms</small></div><p>ICMP zum Router · kein Internet-Speedtest</p></section>
+    <section class="metric"><span>WLAN-Signal</span><div>@Format.Value(S?.Wlan.SignalPercent)<small>%</small></div><p>@Format.Value(S?.Wlan.Rssi) dBm · Kanal @Format.Value(S?.Wlan.Channel)</p></section>
+</div>
+<section class="panel chart-panel"><div class="panel-heading"><div><h3>Datenverkehr</h3><p>Lokale Schnittstelle · gemessene Zeiträume</p></div><div class="legend"><span><i class="dot rx"></i>Empfang</span><span><i class="dot tx"></i>Senden</span></div></div><TrafficChart Samples="State.History" /></section>
+<div class="two-columns">
+    <section class="panel"><div class="panel-heading"><h3>Netzwerkdetails</h3><span class="source">WINDOWS</span></div><dl class="details"><dt>Adapter</dt><dd>@Format.Value(S?.Description)</dd><dt>WLAN-Linkrate ↓ / ↑</dt><dd>@Format.Value(S?.Wlan.ReceiveLinkMbps) / @Format.Value(S?.Wlan.SendLinkMbps) MBit/s</dd><dt>Funkstandard</dt><dd>@Format.Value(S?.Wlan.Radio) · @Format.Value(S?.Wlan.Band)</dd><dt>DNS</dt><dd class="mono">@string.Join(" · ", S?.DnsServers ?? [])</dd><dt>Gateway-MAC</dt><dd class="mono">@Format.Value(S?.GatewayMac)</dd></dl></section>
+    <section class="panel"><div class="panel-heading"><h3>Letzte Ereignisse</h3><span class="source">LOKAL</span></div><div class="event-list">@foreach(var log in State.Logs.Take(4)){<div class="event-row"><span class="event-time">@Format.Time(log.Timestamp)</span><div><strong>@log.Source</strong><p>@log.Message.Split('\n')[0]</p></div></div>}@if(State.Logs.Length == 0){<p class="empty">Ereignisse erscheinen nach der ersten Erfassung.</p>}</div></section>
+</div>
+@code {
+    [Parameter, EditorRequired] public MonitorState State { get; set; } = new();
+    private NetworkSnapshot? S => State.Snapshot;
+    private RouterProfile? Profile => State.Profiles.FirstOrDefault(p => p.Id == State.ProfileId);
+}

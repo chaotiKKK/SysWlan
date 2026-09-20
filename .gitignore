@@ -1,0 +1,11 @@
+.tools/
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
+*.db
+*.db-shm
+*.db-wal
+.freebuff/
+.superpowers/

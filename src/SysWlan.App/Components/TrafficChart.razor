@@ -1,0 +1,27 @@
+<div class="chart" role="img" aria-label="Verlauf von Empfang und Senden in MBit pro Sekunde. Messlücken werden unterbrochen dargestellt.">
+    <div class="chart-scale"><span>@Max.ToString("N1") MBit/s</span><span>0</span></div>
+    <svg viewBox="0 0 900 180" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="0" y1="1" x2="900" y2="1" class="gridline" /><line x1="0" y1="60" x2="900" y2="60" class="gridline" />
+        <line x1="0" y1="120" x2="900" y2="120" class="gridline" /><line x1="0" y1="178" x2="900" y2="178" class="gridline" />
+        <path d="@Path(true)" class="rx-line" /><path d="@Path(false)" class="tx-line" />
+    </svg>
+    <div class="chart-time"><span>@Format.Time(Samples.FirstOrDefault()?.Timestamp)</span><span>@Format.Time(Samples.LastOrDefault()?.Timestamp)</span></div>
+</div>
+@code {
+    [Parameter] public TrafficSample[] Samples { get; set; } = [];
+    private double Max => Math.Max(1, Samples.Select(s => Math.Max(s.ReceiveMbps ?? 0, s.SendMbps ?? 0)).DefaultIfEmpty(1).Max() * 1.15);
+    private string Path(bool rx)
+    {
+        if (Samples.Length < 2) return "";
+        var text = new System.Text.StringBuilder(); var move = true;
+        var duration = Math.Max(1, (Samples[^1].Timestamp - Samples[0].Timestamp).TotalSeconds);
+        for (var i = 0; i < Samples.Length; i++)
+        {
+            var value = rx ? Samples[i].ReceiveMbps : Samples[i].SendMbps;
+            if (value is null) { move = true; continue; }
+            var x = (Samples[i].Timestamp - Samples[0].Timestamp).TotalSeconds / duration * 900;
+            text.Append(FormattableString.Invariant($"{(move ? "M" : "L")}{x:F2},{178 - value.Value / Max * 175:F2} ")); move = false;
+        }
+        return text.ToString();
+    }
+}

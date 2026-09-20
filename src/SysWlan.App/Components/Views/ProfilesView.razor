@@ -1,0 +1,13 @@
+@inject Store Store
+@inject MonitorService Monitor
+<div class="section-heading"><div><span class="eyebrow">WIEDERERKENNEN &amp; VERGLEICHEN</span><h2>Deine Routerprofile</h2></div><span class="pill muted">@State.Profiles.Length gespeichert</span></div>
+<p class="notice">Profile werden anhand der Gateway-MAC wiedererkannt. Ohne diese Kennung entsteht ein vorläufiges Profil. Messwerte zählen nur, während die App erfasst; sie sind kein Abrechnungszähler deines Providers.</p>
+<div class="profile-list">@foreach(var p in State.Profiles){<section class="panel profile-row"><div class="profile-summary"><div class="node-icon">≋</div><div><h3>@p.Name</h3><p>@p.Vendor · @p.Gateway</p><code>@p.Mac</code></div><span class="pill @(p.Id == State.ProfileId ? "good" : "muted")">@(p.Id == State.ProfileId ? "Verbunden" : "Gespeichert")</span></div><div class="profile-stats"><div><small>Zuletzt verbunden</small><strong>@Format.Date(p.LastSeen)</strong></div><div><small>Empfang / Senden</small><strong>@Format.Bytes(p.ReceivedBytes) / @Format.Bytes(p.SentBytes)</strong></div><div><small>Firmware</small><strong>@Format.Value(p.Firmware)</strong></div><button class="button secondary" @onclick="() => Edit(p)">Bearbeiten &amp; Verlauf</button></div></section>}</div>
+@if(State.Profiles.Length == 0){<section class="panel empty">Nach der ersten erfolgreichen Erfassung wird dein Routerprofil automatisch gespeichert.</section>}
+@if(selected is not null){<section class="panel editor"><h3>Profil bearbeiten</h3><label>Name<input maxlength="100" @bind="name" /></label><label>Notizen<textarea maxlength="2000" rows="3" @bind="notes"></textarea></label><div class="toolbar"><button class="button" @onclick="Save">Profil speichern</button><button class="button secondary" @onclick="() => selected = null">Schließen</button><span role="status">@message</span></div><h3>Gespeicherter Verlauf</h3><TrafficChart Samples="history" /></section>}
+@code {
+    [Parameter] public MonitorState State { get; set; } = new();
+    private RouterProfile? selected; private string name = "", notes = "", message = ""; private TrafficSample[] history = [];
+    private void Edit(RouterProfile p) { selected = p; name = p.Name; notes = p.Notes; message = ""; history = Store.History(p.Id, 240); }
+    private void Save() { try { Store.UpdateProfile(selected!.Id, name, notes); Monitor.RefreshStored(); message = "Profil gespeichert."; } catch(Exception ex) { message = ex.Message; } }
+}

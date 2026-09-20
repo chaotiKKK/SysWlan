@@ -1,0 +1,11 @@
+@inject DesktopActions Actions
+<div class="section-heading"><div><span class="eyebrow">QUELLEN &amp; DIAGNOSE</span><h2>Entwicklerwerkzeuge</h2></div></div>
+<section class="panel"><h3>DNS-Auflösung prüfen</h3><p>Eine gezielte Anfrage über die Windows-Namensauflösung. Der Hostname wird an den konfigurierten Resolver übergeben.</p><div class="toolbar"><label>Hostname<input placeholder="example.com" @bind="host" /></label><button class="button" disabled="@busy" @onclick="Resolve">@(busy ? "Wird geprüft …" : "DNS prüfen")</button></div><pre class="result" role="status">@result</pre></section>
+<section class="panel table-panel"><div class="panel-heading"><h3>Funktionsmatrix dieses Adapters</h3></div><table><thead><tr><th>Funktion</th><th>Quelle</th><th>Zugriff</th></tr></thead><tbody><tr><td>WLAN, IP, DNS, Linkraten</td><td>Windows</td><td>Ohne Routeranmeldung</td></tr><tr><td>Lokaler Traffic &amp; Verbindungen</td><td>Windows</td><td>Dieser PC; keine geräteübergreifende Messung</td></tr><tr><td>Firmware &amp; DOCSIS-Status</td><td>Öffentliche Routerseite</td><td>@(State.Router.Error ?? "Firmwareabhängig verfügbar")</td></tr><tr><td>Gastnetz, WLAN-Konfiguration, vollständige Clients</td><td>Integrierte Routeroberfläche</td><td>Routeranmeldung erforderlich</td></tr><tr><td>Automatisierte Routeränderungen</td><td>Router-API</td><td>Noch kein validierter Schreibadapter</td></tr><tr><td>Router-Syslog</td><td>UDP-Empfänger</td><td>Versand im Router erforderlich</td></tr></tbody></table></section>
+<section class="panel"><h3>Aktueller Diagnosezustand</h3><p>Nur freigegebene Statusfelder; keine HTML-Seiten oder Sitzungsschlüssel.</p><pre class="json-view">@Json</pre></section>
+@code {
+    [Parameter] public MonitorState State { get; set; } = new();
+    private string host = "example.com", result = ""; private bool busy;
+    private string Json => System.Text.Json.JsonSerializer.Serialize(new { capturedAt = State.Snapshot?.Timestamp, profileId = State.ProfileId, router = State.Router, addresses = State.Snapshot?.Addresses, dns = State.Snapshot?.DnsServers, errors = State.Snapshot?.Errors }, new System.Text.Json.JsonSerializerOptions{WriteIndented=true});
+    private async Task Resolve(){busy=true;try{result=await Actions.ResolveAsync(host.Trim());}catch(Exception ex){result="DNS-Prüfung fehlgeschlagen: "+ex.Message;}finally{busy=false;}}
+}
