@@ -28,11 +28,11 @@ Die App startet als normaler Benutzer. Monitoring benötigt keine Routeranmeldun
 
 ## Routerzugang
 
-Unter **WLAN & Gastnetz** optional einmalig Benutzername und Routerpasswort speichern. MAUI SecureStorage legt sie unter Windows verschlüsselt im Benutzerkontext ab. Im Routerfenster setzt die Schaltfläche den Zugang ausschließlich auf der erkannten ARRIS-Anmeldeseite ein; anschließend **Einloggen** am Router wählen. Andere Modelle direkt in ihrer Originaloberfläche anmelden. Zugangsdaten werden nicht automatisch in beliebige Passwortfelder eingesetzt.
+Unter **WLAN & Gastnetz** kannst du einen einzelnen manuellen Verbindungstest mit eingegebenem Benutzername und Passwort starten. Pro Klick wird genau ein Versuch ausgeführt; Wiederholung erfolgt nur durch einen neuen Klick, mit Mindestabstand und Abbruchmöglichkeit. MAUI SecureStorage legt Zugangsdaten nur ab, wenn du ausdrücklich „Zugang sicher speichern“ wählst. Die Routeroberfläche setzt keine Zugangsdaten automatisch ein; Anmeldung und Änderungen erfolgen dort manuell. Ein separater lokaler Generator erzeugt starke Passwörter zum manuellen Copy & Paste in den Router, ohne automatische Übertragung oder Speicherung.
 
 Pro Routerprofil wird ein eigener WebView2-Sitzungsordner verwendet. Routerfenster schließen bei Netzwerkadressänderungen, pausierter/fehlgeschlagener oder veralteter Erfassung. HTTP/HTTPS-Adresse und Port dürfen während der Sitzung nicht wechseln. Der gewählte Transport wird nicht still herabgestuft; Zertifikatfehler werden nicht ignoriert. HTTP ist unverschlüsselt. Eine gespeicherte Anmeldung hebt die Sitzungsablaufregeln des Routers nicht auf.
 
-Zugänge entfernen löscht das gespeicherte Passwort, nicht eine bereits am Router laufende Sitzung. Dafür im Router **Abmelden** wählen. Downloads aus der integrierten Oberfläche sind aktuell gesperrt; für Router-Konfigurationsdateien die Herstelleroberfläche im eigenen Browser verwenden.
+Zugänge entfernen löscht das gespeicherte Passwort, nicht eine bereits am Router laufende Sitzung. Dafür im Router **Abmelden** wählen. Der Verbindungstest speichert und protokolliert eingegebene Passwörter nicht. Downloads aus der integrierten Oberfläche sind aktuell gesperrt; für Router-Konfigurationsdateien die Herstelleroberfläche im eigenen Browser verwenden.
 
 ## Daten und Messung
 

@@ -14,6 +14,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(_ => new Store(Path.Combine(FileSystem.AppDataDirectory, "syswlaninfo.db")));
         builder.Services.AddSingleton<INetworkCollector, WindowsCollector>();
         builder.Services.AddSingleton<RouterProbe>();
+        builder.Services.AddSingleton<RouterConnectionTester>();
         builder.Services.AddSingleton<DeviceTimelineService>();
         builder.Services.AddSingleton<CalendarQueryService>();
         builder.Services.AddSingleton<IICalendarExporter, IcsExporter>();

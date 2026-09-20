@@ -1,13 +1,46 @@
+@implements IDisposable
 @inject DesktopActions Actions
 <div class="section-heading"><div><span class="eyebrow">WLAN &amp; ROUTERVERWALTUNG</span><h2>Dein Zugang. Deine Einstellungen.</h2></div><span class="pill muted">@State.Router.Vendor</span></div>
 <div class="two-columns"><section class="panel"><div class="panel-heading"><h3>Aktuelle WLAN-Verbindung</h3><span class="source">WINDOWS</span></div><dl class="details"><dt>SSID</dt><dd>@Format.Value(State.Snapshot?.Ssid)</dd><dt>BSSID</dt><dd class="mono">@Format.Value(State.Snapshot?.Wlan.Bssid)</dd><dt>Sicherheit</dt><dd>@Format.Value(State.Snapshot?.Wlan.Authentication)</dd><dt>Verschlüsselung</dt><dd>@Format.Value(State.Snapshot?.Wlan.Cipher)</dd><dt>Band / Kanal</dt><dd>@Format.Value(State.Snapshot?.Wlan.Band) / @Format.Value(State.Snapshot?.Wlan.Channel)</dd><dt>Band Steering</dt><dd>@(State.Router.BandSteering is null ? "Unbekannt" : State.Router.BandSteering == true ? "Aktiv (Routerstatus)" : "Inaktiv (Routerstatus)")</dd></dl></section>
-<section class="panel"><div class="panel-heading"><h3>Gastnetz &amp; Konfiguration</h3><span class="pill warn">Routeranmeldung</span></div><p>Gast-WLAN erstellen, SSID ändern, Geräte verwalten und Routerlogs ansehen: Öffne dafür die integrierte Originaloberfläche deines Routers.</p><p>Verfügbare Optionen und Berechtigungen bestimmt die Routerfirmware. Direkte automatisierte Konfigurationsänderungen unterstützt dieser Adapter noch nicht.</p><div class="toolbar"><button class="button" disabled="@(State.ProfileId is null)" @onclick="Open">Routerverwaltung öffnen ↗</button><label class="check"><input type="checkbox" @bind="https" />HTTPS verwenden</label></div><p class="footnote">HTTP verschlüsselt den Transport nicht. HTTPS nur verwenden, wenn der Router es unterstützt; Zertifikatfehler werden nicht umgangen.</p></section></div>
-<section class="panel editor"><div class="panel-heading"><div><h3>Routerzugang speichern</h3><p>Optional · nur für dieses verbundene Profil</p></div><span class="pill @(saved ? "good" : "muted")">@(saved ? "Zugang gespeichert" : "Ohne gespeicherten Zugang")</span></div><p>Die App speichert den Zugang im Windows-Geheimnisspeicher. Im Routerfenster kannst du ihn per Schaltfläche in die erkannte ARRIS-Anmeldeseite einsetzen und dort die Anmeldung bestätigen. Andere Router meldest du direkt in ihrer Oberfläche an.</p><div class="form-row"><label>Benutzername<input autocomplete="off" maxlength="100" @bind="username" /></label><label>Routerpasswort<input type="password" autocomplete="new-password" maxlength="512" @bind="password" /></label></div><div class="toolbar"><button class="button" disabled="@(State.ProfileId is null || password.Length == 0)" @onclick="Save">Zugang sicher speichern</button><button class="button secondary" disabled="@(!saved)" @onclick="Forget">Gespeicherten Zugang entfernen</button></div><p class="footnote">Das Entfernen löscht das gespeicherte Passwort. Eine laufende Sitzung beendest du über „Abmelden“ im Routerfenster. Bei pausierter Erfassung oder Netzwerkänderung wird das Routerfenster geschlossen.</p><p role="status">@message</p></section>
+<section class="panel"><div class="panel-heading"><h3>Gastnetz &amp; Konfiguration</h3><span class="pill warn">Routeranmeldung</span></div><p>Gast-WLAN erstellen, SSID ändern, Geräte verwalten und Routerlogs ansehen: Öffne dafür die integrierte Originaloberfläche deines Routers.</p><p>Verfügbare Optionen und Berechtigungen bestimmt die Routerfirmware. Direkte automatisierte Konfigurationsänderungen unterstützt dieser Adapter nicht.</p><div class="toolbar"><button class="button" disabled="@(State.ProfileId is null)" @onclick="Open">Routerverwaltung öffnen ↗</button><label class="check"><input type="checkbox" @bind="https" />HTTPS verwenden</label></div><p class="footnote">HTTP verschlüsselt den Transport nicht. HTTPS nur verwenden, wenn der Router es unterstützt; Zertifikatfehler werden nicht umgangen. Anmeldung und Änderungen erfolgen manuell in der Originaloberfläche.</p></section></div>
+<section class="panel editor"><div class="panel-heading"><div><h3>Manueller Verbindungstest</h3><p>Ein Test pro Klick · keine automatische Passwortsuche</p></div><span class="pill @(saved ? "good" : "muted")">@(saved ? "Zugang gespeichert" : "Nicht gespeichert")</span></div><p>Gib einen einzelnen Zugang ein und starte den Test selbst. Der Versuch verwendet genau diese Daten einmalig, wird nicht wiederholt und das Passwort wird nicht gespeichert oder protokolliert. Der Test unterstützt HTTP-Basic-Authentifizierung; Formularanmeldungen führst du im Routerfenster manuell durch.</p><div class="form-row"><label>Benutzername<input autocomplete="off" maxlength="100" @bind="username" /></label><label>Routerpasswort<input type="password" autocomplete="new-password" maxlength="512" @bind="password" /></label></div><div class="toolbar"><button class="button" disabled="@(testing || State.ProfileId is null || password.Length == 0)" @onclick="TestConnection">@(testing ? "Test läuft …" : "Verbindung testen")</button><button class="button secondary" disabled="@(!testing)" @onclick="CancelTest">Abbrechen</button><button class="button secondary" disabled="@(State.ProfileId is null || password.Length == 0)" @onclick="Save">Zugang sicher speichern</button><button class="button secondary" disabled="@(!saved)" @onclick="Forget">Gespeicherten Zugang entfernen</button></div><p class="footnote">Zwischen manuellen Tests liegen mindestens drei Sekunden. Bei falschen Daten zeigt die App nur das Ergebnis des einzelnen Versuchs.</p><p role="status" class="action-status">@testMessage</p></section>
+<section class="panel editor generator-panel"><div class="panel-heading"><div><h3>Neues Routerpasswort erzeugen</h3><p>Separater Bereich für manuelles Copy &amp; Paste</p></div><span class="pill muted">LOKAL</span></div><p>Das Passwort wird nur auf diesem Gerät erzeugt. Es wird weder automatisch in die Routeroberfläche eingesetzt noch gespeichert. Kopiere es und setze es anschließend manuell im Router.</p><div class="generator-row"><input class="generated-password" type="@(showGenerated ? "text" : "password")" readonly value="@generatedPassword" aria-label="Generiertes Passwort" /><button class="button secondary" disabled="@(generatedPassword.Length == 0)" @onclick="ToggleGenerated">@(showGenerated ? "Verbergen" : "Anzeigen")</button></div><div class="toolbar"><button class="button" @onclick="Generate">@(generatedPassword.Length == 0 ? "Passwort erzeugen" : "Neu erzeugen")</button><button class="button secondary" disabled="@(generatedPassword.Length == 0)" @onclick="CopyGenerated">Kopieren</button><span class="subtle" role="status">@generatorMessage</span></div><p class="footnote">Mindestens 16 Zeichen; Sonderzeichen enthalten. Nach dem Kopieren kann die Zwischenablage durch andere Programme gelesen werden.</p></section>
 @code {
     [Parameter] public MonitorState State { get; set; } = new();
-    private string username = "admin", password = "", message = ""; private string? loadedProfile; private bool saved, https;
-    protected override async Task OnParametersSetAsync() { if(loadedProfile != State.ProfileId) { loadedProfile = State.ProfileId; password = ""; saved = loadedProfile is not null && await Actions.HasCredentialAsync(loadedProfile); } }
-    private async Task Open() { try { await Actions.OpenRouterAsync(State.ProfileId!, https); message = "Routerverwaltung geöffnet."; } catch(Exception ex){ message = ex.Message; } }
-    private async Task Save() { try { await Actions.SaveCredentialAsync(State.ProfileId!, username, password); password = ""; saved = true; message = "Zugang sicher gespeichert."; } catch(Exception ex){ message = ex.Message; } }
-    private void Forget() { if(State.ProfileId is null) return; Actions.ForgetCredential(State.ProfileId); saved = false; password = ""; message = "Gespeicherten Zugang entfernt."; }
+    private string username = "admin", password = "", testMessage = "", generatedPassword = "", generatorMessage = "";
+    private string? loadedProfile;
+    private bool saved, https, testing, showGenerated;
+    private CancellationTokenSource? testCancellation;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedProfile == State.ProfileId) return;
+        CancelTest();
+        loadedProfile = State.ProfileId;
+        password = "";
+        testMessage = "";
+        saved = loadedProfile is not null && await Actions.HasCredentialAsync(loadedProfile);
+    }
+
+    private async Task Open() { try { await Actions.OpenRouterAsync(State.ProfileId!, https); testMessage = "Routerverwaltung geöffnet. Anmeldung bitte manuell durchführen."; } catch(Exception ex){ testMessage = ex.Message; } }
+    private async Task TestConnection()
+    {
+        if (State.ProfileId is null || password.Length == 0 || testing) return;
+        testing = true; testMessage = "Einzelnen Verbindungstest gestartet …"; testCancellation = new CancellationTokenSource();
+        try
+        {
+            var result = await Actions.TestRouterConnectionAsync(State.ProfileId, username, password, https, testCancellation.Token);
+            testMessage = result.Message;
+        }
+        catch (OperationCanceledException) { testMessage = "Verbindungstest abgebrochen."; }
+        catch (Exception ex) { testMessage = ex.Message; }
+        finally { testing = false; testCancellation.Dispose(); testCancellation = null; await InvokeAsync(StateHasChanged); }
+    }
+    private void CancelTest() { testCancellation?.Cancel(); }
+    private async Task Save() { try { await Actions.SaveCredentialAsync(State.ProfileId!, username, password); password = ""; saved = true; testMessage = "Zugang sicher gespeichert."; } catch(Exception ex){ testMessage = ex.Message; } }
+    private void Forget() { if(State.ProfileId is null) return; Actions.ForgetCredential(State.ProfileId); saved = false; password = ""; testMessage = "Gespeicherten Zugang entfernt."; }
+    private async Task Generate() { generatedPassword = await Actions.GeneratePasswordAsync(); showGenerated = false; generatorMessage = "Neu erzeugt; bitte manuell kopieren."; }
+    private async Task CopyGenerated() { try { await Actions.CopyToClipboardAsync(generatedPassword); generatorMessage = "In die Zwischenablage kopiert."; } catch { generatorMessage = "Kopieren war nicht möglich; bitte manuell auswählen."; } }
+    private void ToggleGenerated() { showGenerated = !showGenerated; }
+    public void Dispose() { testCancellation?.Cancel(); testCancellation?.Dispose(); }
 }

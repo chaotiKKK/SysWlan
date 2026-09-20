@@ -6,9 +6,11 @@ using Microsoft.Web.WebView2.Core;
 
 namespace SysWlan.App.Services;
 
-public sealed class DesktopActions(Store store, MonitorService monitor, CalendarQueryService calendar, IICalendarExporter ics)
+public sealed class DesktopActions(Store store, MonitorService monitor, CalendarQueryService calendar, IICalendarExporter ics, RouterConnectionTester connectionTester)
 {
     private readonly List<Microsoft.UI.Xaml.Window> routerWindows = [];
+    private readonly SemaphoreSlim connectionTestGate = new(1, 1);
+    private DateTimeOffset lastConnectionTest = DateTimeOffset.MinValue;
     private static string CredentialKey(string profileId) => "router-credential-" + profileId;
     public async Task SaveCredentialAsync(string profileId, string username, string password)
     {
@@ -26,6 +28,28 @@ public sealed class DesktopActions(Store store, MonitorService monitor, Calendar
             throw new InvalidOperationException("Dieses Profil ist nicht aktuell verbunden. Erfassung fortsetzen und erneut versuchen.");
         return state.Snapshot!;
     }
+    public async Task<RouterConnectionTestResult> TestRouterConnectionAsync(string profileId, string username, string password, bool https, CancellationToken cancellationToken)
+    {
+        EnsureCurrent(profileId);
+        if (!await connectionTestGate.WaitAsync(0, cancellationToken))
+            return new(false, "Es läuft bereits ein Verbindungstest. Bitte warten oder abbrechen.");
+        try
+        {
+            var sinceLast = DateTimeOffset.UtcNow - lastConnectionTest;
+            if (sinceLast < TimeSpan.FromSeconds(3))
+                return new(false, "Bitte mindestens drei Sekunden bis zum nächsten manuellen Test warten.");
+            lastConnectionTest = DateTimeOffset.UtcNow;
+            return await connectionTester.TestAsync(monitor.State.Snapshot!.Gateway, username, password, https, cancellationToken);
+        }
+        finally { connectionTestGate.Release(); }
+    }
+    public async Task<string> GeneratePasswordAsync()
+    {
+        await Task.Yield();
+        return PasswordGenerator.Generate();
+    }
+    public Task CopyToClipboardAsync(string value) => Clipboard.Default.SetTextAsync(value);
+
     public async Task OpenRouterAsync(string profileId, bool https)
     {
         var snapshot = EnsureCurrent(profileId);
@@ -37,8 +61,7 @@ public sealed class DesktopActions(Store store, MonitorService monitor, Calendar
             grid.RowDefinitions.Add(new() { Height = Microsoft.UI.Xaml.GridLength.Auto });
             grid.RowDefinitions.Add(new() { Height = new Microsoft.UI.Xaml.GridLength(1, Microsoft.UI.Xaml.GridUnitType.Star) });
             var status = new Microsoft.UI.Xaml.Controls.TextBlock { Text = $"{uri}  ·  Originale Routeroberfläche · Anmeldung und Änderungen erfolgen am Router.", Margin = new Microsoft.UI.Xaml.Thickness(16, 10, 16, 10), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap };
-            var fill = new Microsoft.UI.Xaml.Controls.Button { Content = "Gespeicherten Zugang auf Anmeldeseite einsetzen", Margin = new Microsoft.UI.Xaml.Thickness(16, 0, 16, 10), IsEnabled = false };
-            var toolbar = new Microsoft.UI.Xaml.Controls.StackPanel(); toolbar.Children.Add(status); toolbar.Children.Add(fill);
+            var toolbar = new Microsoft.UI.Xaml.Controls.StackPanel(); toolbar.Children.Add(status);
             var view = new Microsoft.UI.Xaml.Controls.WebView2();
             Microsoft.UI.Xaml.Controls.Grid.SetRow(view, 1); grid.Children.Add(toolbar); grid.Children.Add(view);
             window.Content = grid; routerWindows.Add(window);
@@ -69,24 +92,6 @@ public sealed class DesktopActions(Store store, MonitorService monitor, Calendar
                 {
                     try { EnsureCurrent(profileId); } catch { args.Cancel = true; return; }
                     if (!RouterAccessPolicy.IsSameOrigin(uri, args.Uri)) { args.Cancel = true; status.Text = "Navigation außerhalb der gewählten Routeradresse wurde blockiert."; }
-                };
-                fill.IsEnabled = true;
-                fill.Click += async (_, args) =>
-                {
-                    try
-                    {
-                        EnsureCurrent(profileId);
-                        if (!RouterAccessPolicy.IsSameOrigin(uri, view.Source?.ToString()) || monitor.State.Router.Vendor != "ARRIS / Vodafone") { status.Text = "Automatisches Einsetzen ist für diese Routeroberfläche nicht validiert."; return; }
-                        var saved = await SecureStorage.Default.GetAsync(CredentialKey(profileId));
-                        if (saved is null) { status.Text = "Kein Zugang gespeichert. Anmeldung direkt hier oder Zugang im Dashboard speichern."; return; }
-                        var credential = JsonSerializer.Deserialize<RouterCredential>(saved)!;
-                        var userJson = JsonSerializer.Serialize(credential.Username); var passwordJson = JsonSerializer.Serialize(credential.Password);
-                        EnsureCurrent(profileId);
-                        var script = "(() => { if(location.origin!==" + JsonSerializer.Serialize(uri.GetLeftPart(UriPartial.Authority)) + " || !['/','/index.php'].includes(location.pathname) || !document.body.classList.contains('login_background')) return false; const p = ['Password','Password_m'].map(id=>document.getElementById(id)).find(e=>e && e.type==='password' && e.getClientRects().length); if(!p) return false; const suffix=p.id.endsWith('_m')?'_m':''; const b=document.getElementById('LoginBtn'+suffix); const u=document.getElementById('UserName'+suffix); if(!b || !u || !b.getClientRects().length) return false; if(!u.disabled){u.value=" + userJson + ";u.dispatchEvent(new Event('input',{bubbles:true}));} p.value=" + passwordJson + ";p.dispatchEvent(new Event('input',{bubbles:true}));p.dispatchEvent(new Event('change',{bubbles:true}));return true; })()";
-                        var result = await view.ExecuteScriptAsync(script);
-                        status.Text = result == "true" ? "Zugang eingesetzt. Anmeldung mit Einloggen im Router bestätigen." : "Keine validierte ARRIS-Anmeldeseite erkannt. Es wurden keine Zugangsdaten eingesetzt.";
-                    }
-                    catch { status.Text = "Zugang konnte nicht eingesetzt werden. Du kannst dich direkt in der Routeroberfläche anmelden."; }
                 };
                 EnsureCurrent(profileId); view.Source = uri;
             }

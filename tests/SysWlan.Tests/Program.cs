@@ -168,6 +168,28 @@ Check("iCalendar export is deterministic and excludes secrets", () =>
     var output = new IcsExporter().Export(new([device], [interval], [], []));
     Require(output == new IcsExporter().Export(new([device], [interval], [], [])) && output.Contains("UID:presence:mac:A:p1@syswlaninfo.local") && !output.Contains("password"), "invalid ICS output");
 });
+Check("password generator creates strong local passwords", () =>
+{
+    var password = PasswordGenerator.Generate();
+    Require(password.Length == 24 && password.Any(char.IsUpper) && password.Any(char.IsLower) && password.Any(char.IsDigit), "weak generated password");
+});
+Check("router credential test sends exactly one explicit request", () =>
+{
+    using var handler = new CredentialHandler();
+    using var tester = new RouterConnectionTester(handler, TimeSpan.FromSeconds(1));
+    var result = tester.TestAsync("192.168.0.1", "admin", "one-secret", false, CancellationToken.None).GetAwaiter().GetResult();
+    Require(result.Succeeded && handler.Requests == 1 && handler.Authorization == "admin:one-secret", "credential test was not one explicit request");
+});
+Check("router credential test cancellation stops without retry", () =>
+{
+    using var handler = new DelayedCredentialHandler();
+    using var tester = new RouterConnectionTester(handler, TimeSpan.FromSeconds(5));
+    using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
+    var canceled = false;
+    try { _ = tester.TestAsync("192.168.0.1", "admin", "secret", false, cancellation.Token).GetAwaiter().GetResult(); }
+    catch (OperationCanceledException) { canceled = true; }
+    Require(canceled && handler.Requests == 1, "cancellation retried credential test");
+});
 Check("CalDAV environment override is secret-safe", () =>
 {
     var path = Path.Combine(Path.GetTempPath(), $"caldav-{Guid.NewGuid():N}.json");
@@ -213,6 +235,25 @@ sealed class RecordingCalDavHandler : HttpMessageHandler
         UpdateConditionSeen |= request.Method == HttpMethod.Put && request.Headers.Contains("If-None-Match");
         var status = request.Method.Method switch { "PROPFIND" => HttpStatusCode.NotFound, "MKCALENDAR" => HttpStatusCode.Created, "PUT" => HttpStatusCode.Created, "DELETE" => HttpStatusCode.NoContent, _ => HttpStatusCode.BadRequest };
         return Task.FromResult(new HttpResponseMessage(status) { RequestMessage = request });
+    }
+}
+sealed class CredentialHandler : HttpMessageHandler
+{
+    public int Requests { get; private set; }
+    public string? Authorization { get; private set; }
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        Requests++;
+        Authorization = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(request.Headers.Authorization?.Parameter ?? ""));
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = request });
+    }
+}
+sealed class DelayedCredentialHandler : HttpMessageHandler
+{
+    public int Requests { get; private set; }
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        Requests++; await Task.Delay(Timeout.Infinite, token); return new HttpResponseMessage(HttpStatusCode.OK);
     }
 }
 sealed class StalledHandler : HttpMessageHandler
