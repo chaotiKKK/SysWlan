@@ -6,7 +6,11 @@ using Microsoft.Web.WebView2.Core;
 
 namespace SysWlan.App.Services;
 
-public sealed class DesktopActions(Store store, MonitorService monitor, CalendarQueryService calendar, IICalendarExporter ics, RouterConnectionTester connectionTester)
+/// <summary>
+/// Windows-Umsetzung: isoliertes WebView2-Fenster je Routerprofil, Export in den Dokumente-Ordner
+/// und Namensauflösung über den Windows-Resolver.
+/// </summary>
+public sealed class WindowsPlatformActions(Store store, MonitorService monitor, CalendarQueryService calendar, IICalendarExporter ics, RouterConnectionTester connectionTester) : IPlatformActions
 {
     private readonly List<Microsoft.UI.Xaml.Window> routerWindows = [];
     private readonly SemaphoreSlim connectionTestGate = new(1, 1);
@@ -102,7 +106,7 @@ public sealed class DesktopActions(Store store, MonitorService monitor, Calendar
     {
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SysWLANInfo"); Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, $"netzwerk-export-{DateTime.Now:yyyyMMdd-HHmmss}.json");
-        await File.WriteAllTextAsync(path, store.Export()); return path;
+        await File.WriteAllTextAsync(path, store.Export()); return $"Export gespeichert: {path}";
     }
     public async Task<string> ExportCalendarAsync(DateOnly anchor, CalendarViewMode mode)
     {
@@ -116,7 +120,7 @@ public sealed class DesktopActions(Store store, MonitorService monitor, Calendar
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, $"netzwerk-kalender-{DateTime.Now:yyyyMMdd-HHmmss}.ics");
         await File.WriteAllTextAsync(path, ics.Export(snapshot), new System.Text.UTF8Encoding(false));
-        return path;
+        return $"Kalender exportiert: {path}";
     }
     public async Task<string> ResolveAsync(string host)
     {

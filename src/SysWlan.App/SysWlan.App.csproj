@@ -1,13 +1,33 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetFrameworks>net10.0-windows10.0.19041.0;net10.0-android</TargetFrameworks>
     <OutputType>Exe</OutputType><RootNamespace>SysWlan.App</RootNamespace>
     <UseMaui>true</UseMaui><SingleProject>true</SingleProject><EnableDefaultCssItems>false</EnableDefaultCssItems>
     <ApplicationTitle>SysWLANInfo</ApplicationTitle><ApplicationId>de.syswlaninfo.app</ApplicationId>
-    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion><ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion><ApplicationVersion>2</ApplicationVersion>
+    <MauiVersion>10.0.101</MauiVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
     <WindowsPackageType>None</WindowsPackageType><WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion><TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <MauiVersion>10.0.101</MauiVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+    <!-- Ohne diese Eigenschaft nutzt .NET Android im Debug-Build "Fast Deployment": Die APK enthält keine
+         Assemblies, sondern erwartet sie unter files/.__override__, wohin nur "dotnet build -t:Install" sie
+         schiebt. Eine per adb install verteilte Debug-APK bricht dann beim Start ab ("No assemblies found").
+         Da die APK das Sideload-Artefakt zum Testen auf Geräten ist, muss sie eigenständig sein. -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <!-- Ein Android-Release würde sonst trimmen: System.Text.Json, SQLite und MAUI brauchen die Reflexion.
+         AOT setzt Trimmung voraus und ist deshalb hier ebenfalls aus. Die APK wird dadurch größer; Trimmung
+         und AOT folgen erst mit quellcodegenerierten JSON-Verträgen und einem Gerätetest. -->
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <!-- Standardmäßig enthält die APK arm64-v8a und x86_64 und ist deshalb groß. Für eine deutlich kleinere
+         APK hier <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers> setzen; dann ist nur dieser Blob enthalten. -->
   </PropertyGroup>
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#152839" />
@@ -18,6 +38,11 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
     <ProjectReference Include="..\SysWlan.Core\SysWlan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
     <ProjectReference Include="..\SysWlan.Windows\SysWlan.Windows.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <ProjectReference Include="..\SysWlan.Android\SysWlan.Android.csproj" />
   </ItemGroup>
 </Project>

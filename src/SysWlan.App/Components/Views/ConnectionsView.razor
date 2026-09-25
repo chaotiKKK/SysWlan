@@ -1,8 +1,9 @@
-<div class="section-heading"><div><span class="eyebrow">DIESER WINDOWS-PC</span><h2>Verbindungen &amp; Prozesse</h2></div><input class="search" aria-label="Verbindungen suchen" placeholder="Prozess, IP oder Port suchen …" @bind="search" @bind:event="oninput" /></div>
+@inject IPlatformInfo Platform
+<div class="section-heading"><div><span class="eyebrow">@Platform.DeviceLabel.ToUpperInvariant()</span><h2>Verbindungen &amp; Prozesse</h2></div><input class="search" aria-label="Verbindungen suchen" placeholder="Prozess, IP oder Port suchen …" @bind="search" @bind:event="oninput" /></div>
 <div class="toolbar"><label>Protokoll <select @bind="protocol"><option value="">Alle</option><option>TCP</option><option>UDP</option></select></label><label class="check"><input type="checkbox" @bind="onlyEstablished" />Nur aktive TCP-Verbindungen</label><span class="subtle">@Connections.Count() Treffer · systemweite Momentaufnahme</span></div>
 <section class="panel table-panel"><table><thead><tr><th>Prozess / PID</th><th>Protokoll</th><th>Lokal</th><th>Gegenstelle</th><th>Status</th></tr></thead><tbody>
 @foreach(var item in Connections.Take(300)){<tr><td><strong>@(item.ProcessName.Length > 0 ? item.ProcessName : "Nicht auflösbar")</strong><small>PID @item.ProcessId</small></td><td class="mono">@item.Protocol</td><td class="mono">@item.LocalAddress<span class="subtle">:@item.LocalPort</span></td><td class="mono">@(item.RemoteAddress.Length > 0 ? $"{item.RemoteAddress}:{item.RemotePort}" : "Keine Gegenstelle (UDP)")</td><td><span class="pill @(item.State == "Established" ? "good" : "muted")">@item.State</span></td></tr>}
-</tbody></table>@if(!Connections.Any()){<p class="empty">Keine passenden Verbindungen.</p>}</section><p class="footnote">Anzeige maximal 300 Treffer; Erfassung maximal 1024 TCP-Verbindungen und 512 UDP-Endpunkte. UDP-Endpunkte liefern keine entfernte Adresse. Ein offener Port ist allein kein Sicherheitsbefund.</p>
+</tbody></table>@if(!Connections.Any()){<p class="empty">Keine passenden Verbindungen.</p>}</section><p class="footnote">@Platform.ConnectionsNote</p>
 @code {
     [Parameter] public MonitorState State { get; set; } = new();
     private string search = "", protocol = ""; private bool onlyEstablished;

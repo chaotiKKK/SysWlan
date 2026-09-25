@@ -212,6 +212,109 @@ Check("CalDAV discovers, creates, updates and deletes collection objects", () =>
     Require(handler.Methods.SequenceEqual(["PROPFIND", "MKCALENDAR", "PUT", "DELETE"]), "unexpected CalDAV capability/object flow: " + string.Join(',', handler.Methods));
     Require(handler.AuthorizationSeen && handler.UpdateConditionSeen, "CalDAV auth/conditional update missing");
 });
+Check("android wifi mapping keeps unknown values unknown", () =>
+{
+    var unknown = AndroidWifiMapping.Map(null, null, null, null, null, null, null, null);
+    Require(unknown.Ssid is null && unknown.Band is null && unknown.Channel is null && unknown.Authentication is null && unknown.Radio is null && unknown.SignalPercent is null, "unknown android values were invented");
+    Require(AndroidWifiMapping.CleanText("0x") is null && AndroidWifiMapping.CleanText("<unknown ssid>") is null && AndroidWifiMapping.CleanText(" ") is null, "android placeholders leaked as SSID");
+});
+Check("android band and channel mapping covers 2.4/5/6 GHz", () =>
+{
+    Require(AndroidWifiMapping.Band(2412) == "2,4 GHz" && AndroidWifiMapping.Channel(2412) == "1", "2.4 GHz channel 1");
+    Require(AndroidWifiMapping.Channel(2437) == "6" && AndroidWifiMapping.Channel(2484) == "14", "2.4 GHz channels 6/14");
+    Require(AndroidWifiMapping.Band(5180) == "5 GHz" && AndroidWifiMapping.Channel(5180) == "36", "5 GHz channel 36");
+    Require(AndroidWifiMapping.Band(5955) == "6 GHz" && AndroidWifiMapping.Channel(5955) == "1" && AndroidWifiMapping.Channel(5975) == "5", "6 GHz channels");
+    Require(AndroidWifiMapping.Channel(6000) is null && AndroidWifiMapping.Channel(0) is null && AndroidWifiMapping.Channel(null) is null && AndroidWifiMapping.Band(1000) is null, "invalid frequencies must stay unknown");
+});
+Check("android signal, radio and security mapping do not guess", () =>
+{
+    Require(AndroidWifiMapping.SignalPercent(-50) == 100 && AndroidWifiMapping.SignalPercent(-71) == 58 && AndroidWifiMapping.SignalPercent(-100) == 0 && AndroidWifiMapping.SignalPercent(-140) == 0, "rssi to percent");
+    Require(AndroidWifiMapping.SignalPercent(null) is null, "missing rssi must stay unknown");
+    Require(AndroidWifiMapping.Radio(6) == "802.11ax" && AndroidWifiMapping.Radio(5) == "802.11ac" && AndroidWifiMapping.Radio(0) is null && AndroidWifiMapping.Radio(null) is null, "radio standard mapping");
+    Require(AndroidWifiMapping.Security(4) == "WPA3-Personal (SAE)" && AndroidWifiMapping.Security(0) == "Offen (unverschlüsselt)" && AndroidWifiMapping.Security(99) is null && AndroidWifiMapping.Security(null) is null, "security mapping");
+});
+Check("android access warnings are explicit instead of silent", () =>
+{
+    Require(AndroidWifiMapping.WifiDetailsWarning(false) is not null && AndroidWifiMapping.WifiDetailsWarning(true) is null, "wifi detail warning");
+    Require(AndroidWifiMapping.UsageAccessWarning(false)?.Contains("Nutzungszugriff") == true && AndroidWifiMapping.UsageAccessWarning(true) is null, "usage access warning");
+    // Gerätetest 2026-09-25: eine fehlende SSID beweist keinen ausgeschalteten Standortschalter.
+    Require(AndroidWifiMapping.LocationDisabledWarning(true, false) is not null, "disabled location switch must be reported");
+    Require(AndroidWifiMapping.LocationDisabledWarning(true, true) is null, "missing ssid must not be blamed on the location switch");
+    Require(AndroidWifiMapping.LocationDisabledWarning(false, false) is null, "location warning is redundant without wifi detail permission");
+    Require(AndroidWifiMapping.DevicesUnavailable.Contains("Nachbartabelle") && AndroidWifiMapping.ConnectionsUnavailable.Contains("Verbindungen"), "unsupported android facts must be named");
+});
+Check("gateway identity prefers the real gateway MAC over the accesspoint BSSID", () =>
+{
+    var direct = GatewayIdentityPolicy.Resolve("aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:99");
+    Require(direct.Source == GatewayIdentityPolicy.GatewayMacSource && direct.Mac == "aa:bb:cc:dd:ee:01", "gateway mac not preferred");
+    var android = GatewayIdentityPolicy.Resolve(null, "AA:BB:CC:DD:EE:99");
+    Require(android.Source == GatewayIdentityPolicy.ApBssidSource && android.Mac == "AA:BB:CC:DD:EE:99", "bssid fallback missing");
+    foreach (var empty in new[] { (string?)null, "", "00:00:00:00:00:00", "FF-FF-FF-FF-FF-FF", "nicht-mac" })
+        Require(GatewayIdentityPolicy.Resolve(empty, empty).Source is null, "unusable hardware identity accepted: " + empty);
+    Require(GatewayIdentityPolicy.Describe(GatewayIdentityPolicy.ApBssidSource).Contains("Zuordnungshilfe"), "bssid source must be described as an inference");
+});
+Check("bssid router identity passes the session policy", () =>
+{
+    var identity = GatewayIdentityPolicy.Resolve(null, "aa:bb:cc:dd:ee:99");
+    NetworkSnapshot Android(string? mac) => new() { Timestamp = start, InterfaceId = "android-wifi", InterfaceName = "wlan0", Gateway = "192.168.0.1", GatewayMac = mac, GatewayMacSource = identity.Source, Ssid = "Test WLAN", Wlan = new WlanInfo { Ssid = "Test WLAN", Bssid = "aa:bb:cc:dd:ee:99" } };
+    var snapshot = Android(identity.Mac);
+    Require(RouterAccessPolicy.CanAccess(new MonitorState { Snapshot = snapshot }, ProfileIdentity.Key(snapshot), start, 5), "android profile cannot reach the router");
+    Require(ProfileIdentity.Key(snapshot) == ProfileIdentity.Key(Android("AA-BB-CC-DD-EE-99")), "bssid identity is delimiter dependent");
+});
+Check("router syslog device parser extracts mac, address and name", () =>
+{
+    var device = RouterSyslogDeviceParser.Parse("dhcpd: DHCPACK on 192.168.0.20 to aa:bb:cc:dd:ee:20 (iPhone-Anna) via br0");
+    Require(device is not null && device.Mac == "AABBCCDDEE20" && device.Address == "192.168.0.20" && device.Name == "iPhone-Anna", "dhcp device not parsed");
+    var associated = RouterSyslogDeviceParser.Parse("hostapd: wlan0: STA aa:bb:cc:dd:ee:21 IEEE 802.11: associated");
+    Require(associated is not null && associated.Name.Length == 0 && associated.Address.Length == 0, "association must not invent a name");
+    Require(RouterSyslogDeviceParser.Parse("kernel: link up, no hardware address here") is null, "line without mac must be ignored");
+    Require(RouterSyslogDeviceParser.Parse("dhcpd: DHCPACK to 00:00:00:00:00:00 (Bogus)") is null, "all zero mac must be ignored");
+});
+Check("syslog device feed merges names and expires stale devices", () =>
+{
+    using var store = new Store(Path.Combine(Path.GetTempPath(), $"syswlan-feed-{Guid.NewGuid():N}.db"));
+    using var receiver = new SyslogReceiver(store);
+    using var feed = new RouterSyslogDeviceFeed(receiver, TimeSpan.FromMinutes(10));
+    feed.Observe("dhcpd: DHCPACK on 192.168.0.20 to aa:bb:cc:dd:ee:20 via br0", start);
+    feed.Observe("dhcpd: DHCPACK on 192.168.0.20 to aa:bb:cc:dd:ee:20 (iPhone-Anna) via br0", start.AddMinutes(1));
+    feed.Observe("hostapd: STA aa:bb:cc:dd:ee:21 IEEE 802.11: associated", start.AddMinutes(2));
+    var devices = feed.RecentDevices(start.AddMinutes(3));
+    Require(devices.Length == 2, "feed did not group devices by mac: " + devices.Length);
+    Require(devices.Single(d => d.Mac == "AABBCCDDEE20").Name == "iPhone-Anna", "later name was not merged");
+    Require(feed.RecentDevices(start.AddMinutes(30)).Length == 0, "stale syslog devices were still claimed");
+});
+Check("background pause stops collection without touching the user pause", () =>
+{
+    var path = Path.Combine(Path.GetTempPath(), $"syswlan-tests-{Guid.NewGuid():N}.db");
+    try
+    {
+        using var store = new Store(path);
+        store.SetSetting("intervalSeconds", "3");
+        var collector = new CountingCollector();
+        using var calendarSync = new CalendarSyncService(store, new NullSyncAdapter());
+        var timeline = new DeviceTimelineService(store, new IcsExporter(), calendarSync);
+        using var monitor = new MonitorService(collector, store, new RouterProbe(new OfflineHandler(), TimeSpan.FromMilliseconds(50)), timeline);
+        monitor.Start();
+        var deadline = DateTime.UtcNow.AddSeconds(6);
+        while (collector.Count == 0 && DateTime.UtcNow < deadline) Thread.Sleep(50);
+        Require(collector.Count > 0, "monitor never collected");
+        monitor.SetBackgrounded(true);
+        Require(monitor.State.Backgrounded && !monitor.State.Paused, "background must not read as a user pause");
+        // Eine bereits laufende Erfassung darf noch zu Ende kommen, bevor die Baseline gilt.
+        Thread.Sleep(700);
+        var stopped = collector.Count;
+        Thread.Sleep(4200);
+        Require(collector.Count == stopped, "collection continued while the app was in the background");
+        monitor.TogglePause();
+        monitor.SetBackgrounded(false);
+        Require(monitor.State.Paused && !monitor.State.Backgrounded, "user pause was overwritten by the lifecycle");
+        monitor.TogglePause();
+        deadline = DateTime.UtcNow.AddSeconds(6);
+        while (collector.Count == stopped && DateTime.UtcNow < deadline) Thread.Sleep(50);
+        Require(collector.Count > stopped, "collection did not resume in the foreground");
+    }
+    finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(path); }
+});
 if (args.Contains("--live"))
 {
     var snapshot = await new SysWlan.Windows.WindowsCollector().CollectAsync(CancellationToken.None);
@@ -236,6 +339,31 @@ sealed class RecordingCalDavHandler : HttpMessageHandler
         var status = request.Method.Method switch { "PROPFIND" => HttpStatusCode.NotFound, "MKCALENDAR" => HttpStatusCode.Created, "PUT" => HttpStatusCode.Created, "DELETE" => HttpStatusCode.NoContent, _ => HttpStatusCode.BadRequest };
         return Task.FromResult(new HttpResponseMessage(status) { RequestMessage = request });
     }
+}
+sealed class CountingCollector : INetworkCollector
+{
+    private int count;
+    public int Count => Volatile.Read(ref count);
+    public Task<NetworkSnapshot> CollectAsync(CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref count);
+        return Task.FromResult(new NetworkSnapshot
+        {
+            Timestamp = DateTimeOffset.UtcNow, InterfaceId = "test-nic", InterfaceName = "WLAN", Gateway = "192.168.0.1",
+            GatewayMac = "AA-BB-CC-DD-EE-01", GatewayMacSource = GatewayIdentityPolicy.GatewayMacSource, Ssid = "Test WLAN",
+            ReceivedBytes = Count * 1000L, SentBytes = Count * 500L
+        });
+    }
+}
+sealed class NullSyncAdapter : ICalendarSyncAdapter
+{
+    public Task<CalendarSyncResult[]> PushAsync(IReadOnlyList<CalendarSyncItem> items, CancellationToken cancellationToken) =>
+        Task.FromResult(items.Select(i => new CalendarSyncResult(i.ObjectId, SyncStatus.Synced, "etag", null)).ToArray());
+}
+sealed class OfflineHandler : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { RequestMessage = request });
 }
 sealed class CredentialHandler : HttpMessageHandler
 {

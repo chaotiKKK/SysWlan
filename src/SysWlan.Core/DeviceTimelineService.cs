@@ -37,7 +37,7 @@ public sealed class DeviceTimelineService(Store store, IICalendarExporter export
             var transition = builder.Observe(source, snapshot.Timestamp, interval, "local");
             var current = transition.Opened.Concat(transition.Updated).LastOrDefault();
             var activity = new ActivityAggregate($"activity-{source}-{snapshot.Timestamp:yyyyMMddHHmmss}", source, snapshot.Timestamp, snapshot.Timestamp, traffic.ReceiveMbps, traffic.SendMbps, traffic.ReceiveMbps is null && traffic.SendMbps is null ? ActivityAvailability.Unavailable : ActivityAvailability.Available, "local-interface");
-            if (current is not null) Save(source, snapshot.LocalMac, "Dieser Windows-PC", snapshot.Timestamp, "local", current, activity, transition.Events);
+            if (current is not null) Save(source, snapshot.LocalMac, "Dieses Gerät", snapshot.Timestamp, "local", current, activity, transition.Events);
         }
 
         foreach (var builder in builders.Values)
