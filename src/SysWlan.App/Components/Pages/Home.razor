@@ -1,24 +1,26 @@
 ﻿@page "/"
 @implements IDisposable
 @inject MonitorService Monitor
-@inject DesktopActions Actions
+@inject IPlatformActions Actions
+@inject IPlatformInfo Platform
 @inject CalendarSyncService CalendarSync
 <div class="app-shell">
-    <aside class="sidebar"><div class="brand"><div class="brand-mark">≋</div><div>SYS<span>WLAN</span><small>NETZWERKZENTRALE</small></div></div><div class="nav-label">ARBEITSBEREICH</div><nav aria-label="Hauptnavigation">@foreach(var item in tabs){<button class="nav-item @(tab == item.Id ? "active" : "")" aria-current="@(tab == item.Id ? "page" : null)" @onclick="() => tab = item.Id"><span class="nav-icon" aria-hidden="true">@item.Icon</span><span>@item.Name</span></button>}</nav><div class="sidebar-bottom"><div class="local-badge"><i class="dot rx"></i> Lokal auf deinem Gerät</div><small>Windows · Version 0.1.0</small></div></aside>
+    <aside class="sidebar"><div class="brand"><div class="brand-mark">≋</div><div>SYS<span>WLAN</span><small>NETZWERKZENTRALE</small></div></div><div class="nav-label">ARBEITSBEREICH</div><nav aria-label="Hauptnavigation">@foreach(var item in tabs){<button class="nav-item @(tab == item.Id ? "active" : "")" aria-current="@(tab == item.Id ? "page" : null)" @onclick="() => tab = item.Id"><span class="nav-icon" aria-hidden="true">@item.Icon</span><span>@item.Name</span></button>}</nav><div class="sidebar-bottom"><div class="local-badge"><i class="dot rx"></i> Lokal auf deinem Gerät</div><small>@Platform.VersionLabel</small></div></aside>
     <div class="workspace"><header class="topbar"><div class="breadcrumb">Netzwerkzentrale <span>/</span> <strong>@tabs.First(t => t.Id == tab).Name</strong></div><div class="top-actions"><span class="capture"><i class="dot @(state.Paused || state.Error is not null ? "amber" : "rx")"></i>@(state.Paused ? "Pausiert" : state.Snapshot is null ? "Wird erfasst" : state.Error is not null ? "Messfehler" : "Erfassung aktiv")</span><button class="button small secondary" @onclick="Monitor.TogglePause">@(state.Paused ? "Fortsetzen" : "Pausieren")</button><button class="button small secondary" @onclick="Export">Export ↗</button></div></header>
     <main id="main"><div class="page-heading"><div><span class="eyebrow">SYSWLANINFO</span><h1>@(tab == "overview" ? "Netzwerkübersicht" : tabs.First(t => t.Id == tab).Name)</h1></div><div class="active-profile"><span>AKTIVES PROFIL</span><strong>@(state.Profiles.FirstOrDefault(p => p.Id == state.ProfileId)?.Name ?? "Wird erkannt …")</strong></div></div>
     @if(state.Error is not null){<div class="notice error" role="alert">@state.Error Vorherige Werte sind veraltet.</div>}
     @if(state.Paused){<div class="notice">Erfassung pausiert. Die angezeigten Werte sind der letzte gespeicherte Stand.</div>}
+    @if(state.Backgrounded){<div class="notice">Die App war im Hintergrund: In dieser Zeit wurde bewusst nicht gemessen. Anwesenheitsintervalle sind dort geschlossen; für Dauermonitoring gibt es den Vordergrunddienst in den Einstellungen.</div>}
     @foreach(var error in state.Snapshot?.Errors ?? []){<div class="notice">@error</div>}
     @if(message.Length > 0){<div class="notice" role="status">@message <button class="text-button" @onclick="() => message = string.Empty">Schließen</button></div>}
     @switch(tab){case "overview":<OverviewView State="state" />break;case "calendar":<CalendarView />break;case "devices":<DevicesView State="state" />break;case "connections":<ConnectionsView State="state" />break;case "wifi":<WifiView State="state" />break;case "profiles":<ProfilesView State="state" />break;case "security":<SecurityView State="state" />break;case "logs":<LogsView State="state" />break;case "developer":<DeveloperView State="state" />break;case "settings":<SettingsView State="state" />break;}
-    </main><footer><span><i class="dot rx"></i> Windows-Erfassung · lokale Speicherung</span><span>Letzte Messung: @Format.Time(state.Snapshot?.Timestamp)</span></footer></div>
+    </main><footer><span><i class="dot rx"></i> @Platform.FooterLabel</span><span>Letzte Messung: @Format.Time(state.Snapshot?.Timestamp)</span></footer></div>
 </div>
 @code {
     private MonitorState state = new(); private string tab = "overview", message = ""; private bool disposed;
     private readonly (string Id,string Name,string Icon)[] tabs = [("overview","Übersicht","◫"),("calendar","Gerätekalender","▦"),("devices","Geräte","▣"),("connections","Verbindungen","⇄"),("wifi","WLAN & Gastnetz","≋"),("profiles","Routerprofile","▤"),("security","Sicherheit","◇"),("logs","Ereignisse & Syslog","≡"),("developer","Entwickler","⌘"),("settings","Einstellungen","⚙")];
     protected override void OnInitialized(){state=Monitor.State;Monitor.Changed+=Refresh;Monitor.Start();CalendarSync.Start();}
     private void Refresh(){if(!disposed)_=InvokeAsync(()=>{state=Monitor.State;StateHasChanged();});}
-    private async Task Export(){try{message="Export gespeichert: "+await Actions.ExportAsync();}catch(Exception ex){message=ex.Message;}}
+    private async Task Export(){try{message=await Actions.ExportAsync();}catch(Exception ex){message=ex.Message;}}
     public void Dispose(){disposed=true;Monitor.Changed-=Refresh;CalendarSync.Dispose();}
 }

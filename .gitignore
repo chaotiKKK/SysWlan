@@ -9,3 +9,6 @@ artifacts/
 *.db-wal
 .freebuff/
 .superpowers/
+# Keystores und Signaturschlüssel gehören nie ins Repository
+*.keystore
+*.jks

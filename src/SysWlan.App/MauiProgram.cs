@@ -1,7 +1,11 @@
 ﻿using Microsoft.Extensions.Logging;
 using SysWlan.Core;
-using SysWlan.Windows;
 using SysWlan.App.Services;
+#if WINDOWS
+using SysWlan.Windows;
+#elif ANDROID
+using SysWlan.Android;
+#endif
 namespace SysWlan.App;
 public static class MauiProgram
 {
@@ -12,7 +16,6 @@ public static class MauiProgram
         System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddSingleton(_ => new Store(Path.Combine(FileSystem.AppDataDirectory, "syswlaninfo.db")));
-        builder.Services.AddSingleton<INetworkCollector, WindowsCollector>();
         builder.Services.AddSingleton<RouterProbe>();
         builder.Services.AddSingleton<RouterConnectionTester>();
         builder.Services.AddSingleton<DeviceTimelineService>();
@@ -26,7 +29,21 @@ public static class MauiProgram
         builder.Services.AddSingleton<CalendarSyncService>();
         builder.Services.AddSingleton<MonitorService>();
         builder.Services.AddSingleton<SyslogReceiver>();
-        builder.Services.AddSingleton<DesktopActions>();
+#if WINDOWS
+        builder.Services.AddSingleton<INetworkCollector, WindowsCollector>();
+        builder.Services.AddSingleton<IPlatformActions, WindowsPlatformActions>();
+        builder.Services.AddSingleton<IPlatformInfo, WindowsPlatformInfo>();
+        builder.Services.AddSingleton<IPlatformPermissions, WindowsPlatformPermissions>();
+        builder.Services.AddSingleton<IBackgroundMonitoring, WindowsBackgroundMonitoring>();
+#elif ANDROID
+        builder.Services.AddSingleton<NetworkEventsRecorder>();
+        builder.Services.AddSingleton<RouterSyslogDeviceFeed>();
+        builder.Services.AddSingleton<INetworkCollector, AndroidCollector>();
+        builder.Services.AddSingleton<IPlatformActions, AndroidPlatformActions>();
+        builder.Services.AddSingleton<IPlatformInfo, AndroidPlatformInfo>();
+        builder.Services.AddSingleton<IPlatformPermissions, AndroidPlatformPermissions>();
+        builder.Services.AddSingleton<IBackgroundMonitoring, AndroidBackgroundMonitoring>();
+#endif
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();

@@ -43,10 +43,11 @@ public sealed class WindowsCollector : INetworkCollector
             catch (PingException) { }
         }
         var wlan = adapter.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? WlanParser.Parse(data.WlanText) : new WlanInfo();
+        var identity = GatewayIdentityPolicy.Resolve(data.GatewayMac, null);
         return new()
         {
             Timestamp = DateTimeOffset.UtcNow, InterfaceId = adapter.Id, InterfaceName = adapter.Name, Description = adapter.Description,
-            Gateway = string.IsNullOrEmpty(data.Gateway) ? null : data.Gateway, GatewayMac = data.GatewayMac, LocalMac = adapter.GetPhysicalAddress().ToString(),
+            Gateway = string.IsNullOrEmpty(data.Gateway) ? null : data.Gateway, GatewayMac = identity.Mac, GatewayMacSource = identity.Source, LocalMac = adapter.GetPhysicalAddress().ToString(),
             Ssid = wlan.Ssid, Wlan = wlan, LinkSpeed = adapter.Speed, ReceivedBytes = counters.BytesReceived, SentBytes = counters.BytesSent,
             Addresses = properties.UnicastAddresses.Select(a => a.Address.ToString()).ToArray(), DnsServers = properties.DnsAddresses.Select(a => a.ToString()).ToArray(),
             GatewayLatencyMs = latency, Devices = data.Devices, Connections = data.Connections, Events = data.Events, Errors = data.Errors

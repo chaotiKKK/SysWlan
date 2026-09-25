@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Routeroberflächen im Heimnetz arbeiten in der Regel über HTTP. Android blockiert Klartext ab targetSdk 28
+  standardmäßig für alle Netzwerkstapel inklusive WebView; ohne diese Freigabe könnte die App den Router
+  weder anzeigen noch den Verbindungstest ausführen.
+  Die eigentliche Einschränkung liegt im Code: Routerzugriffe sind über RouterAccessPolicy.IsSameOrigin
+  an die aktuelle Gateway-Adresse gebunden, ein Routerfenster öffnet nur mit frischer Erfassung, und
+  Klartextverbindungen zu anderen Hosts führt die App nicht aus.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

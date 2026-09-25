@@ -20,7 +20,9 @@ try {
     if ($LASTEXITCODE) { throw 'Tests failed.' }
     $runningApp = Get-Process -Name 'SysWlan.App' -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($projectRoot, [System.StringComparison]::OrdinalIgnoreCase) }
     if ($runningApp) { throw 'Windows publish cannot replace locked files. Close SysWlan.App and run scripts\\build.ps1 again.' }
-    & $sdk publish src/SysWlan.App/SysWlan.App.csproj -c Release -r win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -p:WindowsPackageType=None -o artifacts/windows
+    # RuntimeIdentifierOverride statt -r: das Projekt zielt auch auf Android, und ein globaler RID würde beim
+    # Wiederherstellen auf die Android-Bibliothek übergreifen.
+    & $sdk publish src/SysWlan.App/SysWlan.App.csproj -f net10.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -p:WindowsPackageType=None -o artifacts/windows
     if ($LASTEXITCODE) { throw 'Windows publish failed.' }
     Write-Output (Join-Path $projectRoot 'artifacts\windows\SysWlan.App.exe')
 } finally { Pop-Location }

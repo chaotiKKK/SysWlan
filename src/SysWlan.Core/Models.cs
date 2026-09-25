@@ -8,12 +8,17 @@ public sealed record NetworkSnapshot
     public string Description { get; init; } = "";
     public string? Gateway { get; init; }
     public string? GatewayMac { get; init; }
+    /// <summary>Quelle der Routerkennung: "gateway-mac" (Windows) oder "ap-bssid" (Android, ohne Gateway-MAC).</summary>
+    public string? GatewayMacSource { get; init; }
     public string? LocalMac { get; init; }
     public string? Ssid { get; init; }
     public string[] Addresses { get; init; } = [];
     public string[] DnsServers { get; init; } = [];
     public long ReceivedBytes { get; init; }
     public long SentBytes { get; init; }
+    /// <summary>Eigene App-Zähler, nur dort gefüllt, wo die Gerätesumme nicht verfügbar ist (Android ohne Nutzungszugriff).</summary>
+    public long? AppReceivedBytes { get; init; }
+    public long? AppSentBytes { get; init; }
     public long LinkSpeed { get; init; }
     public long? GatewayLatencyMs { get; init; }
     public WlanInfo Wlan { get; init; } = new();

@@ -1,6 +1,6 @@
 @inject CalendarQueryService Calendar
 @inject Store Store
-@inject DesktopActions Actions
+@inject IPlatformActions Actions
 <section class="calendar-page" data-theme="@(dark ? "dark" : "light")">
     <div class="section-heading">
         <div><span class="eyebrow">ZEITACHSE &amp; BEOBACHTUNG</span><h2>Gerätekalender</h2><p class="subtle">Lokale Beobachtungen · keine vollständige Router-Clientliste</p></div>
@@ -33,7 +33,7 @@
     private void Next() { anchor = mode == CalendarViewMode.Month ? anchor.AddMonths(1) : anchor.AddDays(mode == CalendarViewMode.Week ? 7 : 1); Reload(); }
     private void Today() { anchor = DateOnly.FromDateTime(DateTime.Now); Reload(); }
     private void ToggleDark(ChangeEventArgs args) => dark = bool.TryParse(args.Value?.ToString(), out var value) && value;
-    private async Task Export() { try { message = "Kalender exportiert: " + await Actions.ExportCalendarAsync(anchor, mode); } catch(Exception ex) { message = SyslogParser.Redact(ex.Message); } }
+    private async Task Export() { try { message = await Actions.ExportCalendarAsync(anchor, mode); } catch(Exception ex) { message = SyslogParser.Redact(ex.Message); } }
     private void Rename(CalendarDevice device, string value) { try { Store.UpdateCalendarDevice(device.Id, value, device.ManualColor, device.Icon, device.IsVisible); Reload(); message = "Gerätename gespeichert."; } catch(Exception ex) { message = ex.Message; } }
     private void Recolor(CalendarDevice device, string? value) { try { Store.UpdateCalendarDevice(device.Id, device.Name, value, device.Icon, device.IsVisible); Reload(); message = "Gerätefarbe gespeichert."; } catch(Exception ex) { message = ex.Message; } }
     private void ToggleMerge(string id, ChangeEventArgs args) { if (bool.TryParse(args.Value?.ToString(), out var selected) && selected) mergeSources.Add(id); else mergeSources.Remove(id); }

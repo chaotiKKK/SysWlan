@@ -1,6 +1,6 @@
 # SysWLANInfo
 
-Lokale Windows-Netzwerkzentrale mit echten Messwerten, gespeicherten Routerprofilen und integrierter Routerverwaltung. Version 0.1.0 ist eine erste nutzbare Windows-Version; kein universeller Router-Schreibadapter und noch keine Android-APK.
+Lokale Netzwerkzentrale mit echten Messwerten, gespeicherten Routerprofilen und integrierter Routerverwaltung. Version 0.2.0 läuft unter Windows und erstmals als Android-APK; weiterhin kein universeller Router-Schreibadapter.
 
 ## Starten
 
@@ -25,6 +25,23 @@ Die App startet als normaler Benutzer. Monitoring benötigt keine Routeranmeldun
 | Syslog | Optionaler UDP-Empfänger auf IP/Port, Redaktion, Begrenzung | Router muss Versand unterstützen; UDP ohne Absenderauthentifizierung |
 | Entwickler | DNS-Prüfung, redigierter Diagnosezustand, Funktionsmatrix | Kein beliebiger Shellzugriff aus der UI |
 | Einstellungen | Abfrageintervall, Aufbewahrung, JSON-Export | Kein Profilimport; Export enthält begrenzte letzte Messpunkte |
+
+## Android
+
+Version 0.2.0 gibt es als Android-APK zum Sideload. Erfassung, Routerbereich, Kalender, Export und Einstellungen sind vorhanden, aber an die Android-Bedingungen angepasst:
+
+| Bereich | Android |
+|---|---|
+| Gateway, IP, DNS, WLAN-Details, Signal | `ConnectivityManager` und `WifiManager`; braucht die Nachbar- bzw. Standortberechtigung und den eingeschalteten Standortschalter |
+| Datenverkehr | geräteweit über `NetworkStatsManager`, dafür Systemzugriff „Nutzungszugriff“; die eigene App erscheint als klar gekennzeichneter Nebenwert |
+| Ereignisse | Android-Netzwerkereignisse statt Windows-Ereignisprotokoll |
+| Geräte im Netz | nur, was der Router per Syslog meldet (DHCP/WLAN-Anmeldung); die Nachbartabelle ist unter Android gesperrt |
+| Verbindungen und Prozesse | nicht verfügbar; Android erlaubt diese Einsicht nicht |
+| Routerkennung | BSSID des Accesspoints, weil Android keine Gateway-MAC herausgibt — als Zuordnungshilfe gekennzeichnet |
+| Routeroberfläche | Seite in der App mit derselben Origin-, Navigations- und Sitzungsprüfung; Klartext-HTTP nur zum eigenen Gateway |
+| Hintergrund | ohne Zusatzschalter pausiert die Erfassung und protokolliert die Lücke; optionaler Vordergrunddienst mit Benachrichtigung |
+
+Bauen, signieren und die vollständige Liste der Grenzen: [Android-Dokumentation](docs/android.md).
 
 ## Routerzugang
 
@@ -52,7 +69,7 @@ Optional synchronisiert die App den gemeinsamen CalDAV-Kalender `Netzwerkgeräte
 
 ## Entwickeln und prüfen
 
-Voraussetzung: Windows 10 ab Build 17763 oder Windows 11, x64, WebView2. Entwicklung mit lokalem .NET SDK 10.0.401 und MAUI Windows.
+Voraussetzung Windows: Windows 10 ab Build 17763 oder Windows 11, x64, WebView2. Voraussetzung Android: Android-SDK und JDK 17/21. Entwicklung mit lokalem .NET SDK 10.0.401 sowie den Workloads MAUI Windows und MAUI Android.
 
 ```powershell
 # Einmalige lokale Toolchain-Einrichtung und Build
@@ -65,10 +82,21 @@ powershell -File scripts/build.ps1
 .tools/dotnet/dotnet.exe run --project tests/SysWlan.Tests -- --live
 ```
 
-`src/SysWlan.Core` enthält Datenmodell, Speicherung, Parser und Monitoring. `src/SysWlan.Windows` kapselt Windows-Erfassung mit einem eingebetteten festen PowerShell-Skript. `src/SysWlan.App` enthält MAUI, Razor-Ansichten und native Routerfenster. Das Skript erhält keine nutzerdefinierten Shellbefehle. Das Release startet keinen Debugport; ein solcher wurde ausschließlich für die lokale UI-Prüfung über die Prozessumgebung aktiviert.
+`src/SysWlan.Core` enthält Datenmodell, Speicherung, Parser und Monitoring. `src/SysWlan.Windows` kapselt Windows-Erfassung mit einem eingebetteten festen PowerShell-Skript. `src/SysWlan.Android` kapselt die Android-Erfassung über ConnectivityManager, WifiManager und NetworkStatsManager. `src/SysWlan.App` enthält MAUI, Razor-Ansichten und die plattformspezifischen Oberflächen: Routerfenster unter Windows, Router-Seite und Vordergrunddienst unter Android. Das Windows-Skript erhält keine nutzerdefinierten Shellbefehle. Das Release startet keinen Debugport; ein solcher wurde ausschließlich für die lokale UI-Prüfung über die Prozessumgebung aktiviert.
 
-## Späteres Android-Ziel
+```powershell
+# Android: Workload/SDK/JDK bei Bedarf einrichten, dann Debug-APK bauen
+powershell -File scripts/build-android.ps1 -Bootstrap
+powershell -File scripts/build-android.ps1
 
-Das gemeinsame Datenmodell, die Zeitachse, Parser und große Teile der Razor-Oberfläche können übernommen werden. Android braucht einen eigenen Netzwerkadapter, Berechtigungsabläufe, sicheren Sitzungsspeicher und Tests auf realen Geräten. PC-weite Prozessverbindungen und Windows-Ereignisprotokolle sind dort nicht gleichwertig verfügbar. Details: [Android-Roadmap](docs/android.md).
+# Signiertes Release-APK (Keystore außerhalb des Repositorys, Passwörter über Umgebungsvariablen)
+powershell -File scripts/build-android.ps1 -CreateKeystore
+powershell -File scripts/build-android.ps1 -Release
+```
+
+
+## Android-Status und offene Punkte
+
+Die APK ist gebaut, signierbar und geprüft bis zum zusammengeführten Manifest, zur Signatur und zur Paketinhaltliste. Ein Test auf einem echten Gerät steht noch aus, weil keines angeschlossen war: Berechtigungsdialoge, reale WLAN-Werte, geräteweiter Datenverkehr, Dienst-Toggle, Routeranmeldung und Export müssen dort noch bestätigt werden. Details, Grenzen und Begründungen: [Android-Dokumentation](docs/android.md).
 
 Offizielle Grundlagen: [.NET MAUI](https://learn.microsoft.com/en-us/dotnet/maui/), [Windows-Veröffentlichung](https://learn.microsoft.com/en-us/dotnet/maui/windows/deployment/publish-unpackaged-cli), [Vodafone Station](https://www.vodafone.de/hilfe/router/station.html).
